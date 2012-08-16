@@ -32,6 +32,7 @@ import org.vertx.java.core.http.HttpClientRequest;
 import org.vertx.java.core.http.HttpClientResponse;
 import org.vertx.java.core.impl.Context;
 import org.vertx.java.core.impl.LowerCaseKeyMap;
+import org.vertx.java.core.impl.VertxInternal;
 import org.vertx.java.core.logging.Logger;
 import org.vertx.java.core.logging.impl.LoggerFactory;
 
@@ -47,28 +48,29 @@ public class DefaultHttpClientRequest implements HttpClientRequest {
 
   private static final Logger log = LoggerFactory.getLogger(HttpClient.class);
 
-  DefaultHttpClientRequest(final DefaultHttpClient client, final String method, final String uri,
+  DefaultHttpClientRequest(final VertxInternal vertx, final DefaultHttpClient client, final String method, final String uri,
                            final Handler<HttpClientResponse> respHandler,
                            final Context context) {
-    this(client, method, uri, respHandler, context, false);
+    this(vertx, client, method, uri, respHandler, context, false);
   }
 
   /*
   Raw request - used by websockets
   Raw requests won't have any headers set automatically, like Content-Length and Connection
   */
-  DefaultHttpClientRequest(final DefaultHttpClient client, final String method, final String uri,
+  DefaultHttpClientRequest(final VertxInternal vertx, final DefaultHttpClient client, final String method, final String uri,
                            final Handler<HttpClientResponse> respHandler,
                            final Context context,
                            final ClientConnection conn) {
-    this(client, method, uri, respHandler, context, true);
+    this(vertx, client, method, uri, respHandler, context, true);
     this.conn = conn;
     conn.setCurrentRequest(this);
   }
 
-  private DefaultHttpClientRequest(final DefaultHttpClient client, final String method, final String uri,
+  private DefaultHttpClientRequest(final VertxInternal vertx, final DefaultHttpClient client, final String method, final String uri,
                                    final Handler<HttpClientResponse> respHandler,
                                    final Context context, final boolean raw) {
+    this.vertx = vertx;
     this.client = client;
     this.request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.valueOf(method), uri);
     this.chunked = false;
@@ -97,6 +99,16 @@ public class DefaultHttpClientRequest implements HttpClientRequest {
   private long written;
   //private long contentLength = 0;
   private Map<String, Object> headers;
+  private VertxInternal vertx;
+  private long timerId = -1;
+  private long timeout;
+  private Handler<Long> timeoutHandler;
+
+  @Override
+  public void setTimeoutHandler(final long timeout, final Handler<Long> timeoutHandler) {
+    this.timeout = timeout;
+    this.timeoutHandler = timeoutHandler;
+  }
 
   public DefaultHttpClientRequest setChunked(boolean chunked) {
     check();
@@ -224,6 +236,9 @@ public class DefaultHttpClientRequest implements HttpClientRequest {
   public void end() {
     check();
     completed = true;
+    if (timeoutHandler != null) {
+      timerId = this.vertx.setTimer(timeout, timeoutHandler);
+    }
     if (conn != null) {
       if (!headWritten) {
         // No body
@@ -235,6 +250,13 @@ public class DefaultHttpClientRequest implements HttpClientRequest {
       conn.endRequest();
     } else {
       connect();
+    }
+  }
+
+  void endTimer() {
+    if (timerId != -1) {
+        vertx.cancelTimer(timerId);
+        timerId = -1;
     }
   }
 

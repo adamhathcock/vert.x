@@ -99,7 +99,7 @@ class ClientConnection extends AbstractConnection {
       wsHandshakeConnection = true;
 
       // Create a raw request
-      DefaultHttpClientRequest req = new DefaultHttpClientRequest(client, "GET", uri, new Handler<HttpClientResponse>() {
+      DefaultHttpClientRequest req = new DefaultHttpClientRequest(vertx, client, "GET", uri, new Handler<HttpClientResponse>() {
         public void handle(HttpClientResponse resp) {
           if (resp.statusCode == 101) {
             try {
@@ -267,6 +267,7 @@ class ClientConnection extends AbstractConnection {
     if (currentRequest == null) {
       throw new IllegalStateException("No write in progress");
     }
+    currentRequest.endTimer();
     currentRequest = null;
 
     if (keepAlive) {

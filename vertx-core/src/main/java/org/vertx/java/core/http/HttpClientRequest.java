@@ -60,6 +60,8 @@ import java.util.Map;
  */
 public interface HttpClientRequest extends WriteStream {
 
+  void setTimeoutHandler(final long timeout, final Handler<Long> timeoutHandler);
+
   /**
    * If chunked is true then the request will be set into HTTP chunked mode
    * @param chunked

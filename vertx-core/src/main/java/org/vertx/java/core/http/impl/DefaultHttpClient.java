@@ -186,7 +186,7 @@ public class DefaultHttpClient implements HttpClient {
   }
 
   public HttpClientRequest request(String method, String uri, Handler<HttpClientResponse> responseHandler) {
-    return new DefaultHttpClientRequest(this, method, uri, responseHandler, ctx);
+    return new DefaultHttpClientRequest(vertx, this, method, uri, responseHandler, ctx);
   }
 
   public void close() {
