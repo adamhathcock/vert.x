@@ -111,15 +111,15 @@ class ClientConnection extends AbstractConnection {
                     ws = new DefaultWebSocket(vertx, null, ClientConnection.this, null);
                     wsConnect.handle(ws);
                   } else {
-                    client.handleException(fut.exception);
+                    handleException(fut.exception);
                   }
                 }
               });
             } catch (Exception e) {
-              client.handleException(e);
+              handleException(e);
             }
           } else {
-            client.handleException(new IOException("Websocket connection attempt returned HTTP status code " + resp.statusCode));
+            handleException(new IOException("Websocket connection attempt returned HTTP status code " + resp.statusCode));
           }
         }
       }, context, this);

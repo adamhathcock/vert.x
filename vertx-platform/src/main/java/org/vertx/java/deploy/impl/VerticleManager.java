@@ -397,12 +397,6 @@ public class VerticleManager implements ModuleReloader {
   public void installMod(final String moduleName, final Handler<Boolean> doneHandler) {
     HttpClient client = vertx.createHttpClient();
     client.setHost(defaultRepo);
-    client.exceptionHandler(new Handler<Exception>() {
-      public void handle(Exception e) {
-        log.error("Unable to connect to repository");
-        doneHandler.handle(false);
-      }
-    });
     String uri = REPO_URI_ROOT + moduleName + "/mod.zip";
     log.info("Attempting to install module " + moduleName + " from http://" + defaultRepo + uri);
     HttpClientRequest req = client.get(uri, new Handler<HttpClientResponse>() {
@@ -423,6 +417,12 @@ public class VerticleManager implements ModuleReloader {
         }
       }
     });
+      req.exceptionHandler(new Handler<Exception>() {
+        public void handle(Exception e) {
+          log.error("Unable to connect to repository");
+          doneHandler.handle(false);
+        }
+      });
     req.putHeader("host", defaultRepo);
     req.putHeader("user-agent", "Vert.x Module Installer");
     req.end();

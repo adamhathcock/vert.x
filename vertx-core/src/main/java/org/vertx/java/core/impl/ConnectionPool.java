@@ -57,7 +57,7 @@ public abstract class ConnectionPool<T> {
   }
 
 
-  public void getConnection(Handler<T> handler, Context context) {
+  public void getConnection(Handler<T> handler, Context context, final Handler<Throwable> connectFailureHandler) {
     boolean connect = false;
     T conn;
     outer: synchronized (this) {
@@ -72,7 +72,7 @@ public abstract class ConnectionPool<T> {
           break outer;
         }
         // Add to waiters
-        waiters.add(new Waiter(handler, context));
+        waiters.add(new Waiter(handler, context, connectFailureHandler));
       }
     }
     // We do this outside the sync block to minimise the critical section
@@ -80,7 +80,7 @@ public abstract class ConnectionPool<T> {
       handler.handle(conn);
     }
     else if (connect) {
-      connect(handler, context);
+      connect(handler, context, connectFailureHandler);
     }
   }
 
@@ -104,7 +104,7 @@ public abstract class ConnectionPool<T> {
     }
     // We do the actual connect outside the sync block to minimise the critical section
     if (waiter != null) {
-      connect(waiter.handler, waiter.context);
+      connect(waiter.handler, waiter.context, waiter.connectFailureHandler);
     }
   }
 
@@ -141,15 +141,17 @@ public abstract class ConnectionPool<T> {
   /**
    * Implement this method in a sub-class to implement the actual connection creation for the specific type of connection
    */
-  protected abstract void connect(final Handler<T> connectHandler, final Context context);
+  protected abstract void connect(final Handler<T> connectHandler, final Context context, final Handler<Throwable> connectFailureHandler);
 
   private class Waiter {
     final Handler<T> handler;
     final Context context;
+    final Handler<Throwable> connectFailureHandler;
 
-    private Waiter(Handler<T> handler, Context context) {
+    private Waiter(Handler<T> handler, Context context, final Handler<Throwable> connectFailureHandler) {
       this.handler = handler;
       this.context = context;
+        this.connectFailureHandler = connectFailureHandler;
     }
   }
 }

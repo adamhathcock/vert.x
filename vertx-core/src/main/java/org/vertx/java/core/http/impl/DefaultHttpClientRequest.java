@@ -271,6 +271,14 @@ public class DefaultHttpClientRequest implements HttpClientRequest {
   }
 
   private void connect() {
+    final Handler<Throwable> connectFailureHandler = new Handler<Throwable>() {
+      @Override
+      public void handle(final Throwable t) {
+        if (t instanceof Exception) {
+          handleException((Exception)t);
+        }
+      }
+    };
     if (!connecting) {
       //We defer actual connection until the first part of body is written or end is called
       //This gives the user an opportunity to set an exception handler before connecting so
@@ -283,7 +291,7 @@ public class DefaultHttpClientRequest implements HttpClientRequest {
             connect();
           }
         }
-      }, context);
+      }, context, connectFailureHandler);
 
       connecting = true;
     }

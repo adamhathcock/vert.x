@@ -70,12 +70,11 @@ public class DefaultHttpClient implements HttpClient {
   private ClientBootstrap bootstrap;
   private NioClientSocketChannelFactory channelFactory;
   private Map<Channel, ClientConnection> connectionMap = new ConcurrentHashMap();
-  private Handler<Exception> exceptionHandler;
   private int port = 80;
   private String host = "localhost";
   private final ConnectionPool<ClientConnection> pool = new ConnectionPool<ClientConnection>() {
-    protected void connect(Handler<ClientConnection> connectHandler, Context context) {
-      internalConnect(connectHandler);
+    protected void connect(Handler<ClientConnection> connectHandler, Context context, final Handler<Throwable> connectFailureHandler) {
+      internalConnect(connectHandler, connectFailureHandler);
     }
   };
   private boolean keepAlive = true;
@@ -91,10 +90,6 @@ public class DefaultHttpClient implements HttpClient {
         close();
       }
     });
-  }
-
-  public void exceptionHandler(Handler<Exception> handler) {
-    this.exceptionHandler = handler;
   }
 
   public DefaultHttpClient setMaxPoolSize(int maxConnections) {
@@ -134,7 +129,12 @@ public class DefaultHttpClient implements HttpClient {
           connectWebsocket(uri, wsVersion, wsConnect);
         }
       }
-    }, ctx);
+    }, ctx, new Handler<Throwable>() {
+                @Override
+                public void handle(final Throwable event) {
+
+                }
+            });
   }
 
   public void getNow(String uri, Handler<HttpClientResponse> responseHandler) {
@@ -331,23 +331,15 @@ public class DefaultHttpClient implements HttpClient {
     return tcpHelper.getTrustStorePassword();
   }
 
-  void getConnection(Handler<ClientConnection> handler, Context context) {
-    pool.getConnection(handler, context);
+  void getConnection(Handler<ClientConnection> handler, Context context, final Handler<Throwable> connectFailureHandler) {
+    pool.getConnection(handler, context, connectFailureHandler);
   }
 
   void returnConnection(final ClientConnection conn) {
     pool.returnConnection(conn);
   }
 
-  void handleException(Exception e) {
-    if (exceptionHandler != null) {
-      exceptionHandler.handle(e);
-    } else {
-      log.error("Unhandled exception", e);
-    }
-  }
-
-  private void internalConnect(final Handler<ClientConnection> connectHandler) {
+  private void internalConnect(final Handler<ClientConnection> connectHandler, final Handler<Throwable> connectFailureHandler) {
 
     if (bootstrap == null) {
       VertxWorkerPool pool = new VertxWorkerPool();
@@ -403,7 +395,7 @@ public class DefaultHttpClient implements HttpClient {
                 if (channelFuture.isSuccess()) {
                   connected(ch, connectHandler);
                 } else {
-                  failed(ch, new SSLHandshakeException("Failed to create SSL connection"));
+                  failed(ch, new SSLHandshakeException("Failed to create SSL connection"), connectFailureHandler);
                 }
               }
             });
@@ -412,7 +404,7 @@ public class DefaultHttpClient implements HttpClient {
           }
 
         } else {
-          failed(ch, channelFuture.getCause());
+          failed(ch, channelFuture.getCause(), connectFailureHandler);
         }
       }
     });
@@ -435,12 +427,12 @@ public class DefaultHttpClient implements HttpClient {
     });
   }
 
-  private void failed(NioSocketChannel ch, final Throwable t) {
-    if (t instanceof Exception && exceptionHandler != null) {
+  private void failed(NioSocketChannel ch, final Throwable t, final Handler<Throwable> connectFailureHandler) {
+    if (t instanceof Exception && connectFailureHandler != null) {
       tcpHelper.runOnCorrectThread(ch, new Runnable() {
         public void run() {
           Context.setContext(ctx);
-          exceptionHandler.handle((Exception) t);
+            connectFailureHandler.handle(t);
         }
       });
     } else {

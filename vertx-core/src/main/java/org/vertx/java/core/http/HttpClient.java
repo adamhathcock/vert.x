@@ -36,11 +36,6 @@ import java.util.Map;
 public interface HttpClient {
 
   /**
-   * Set an exception handler
-   */
-  void exceptionHandler(Handler<Exception> handler) ;
-
-  /**
    * Set the maximum pool size<p>
    * The client will maintain up to {@code maxConnections} HTTP connections in an internal pool<p>
    * @return A reference to this, so multiple invocations can be chained together.
